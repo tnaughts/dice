@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lucky Dice — St. Patrick's Day Edition</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: Georgia, serif;
+    background: radial-gradient(ellipse at center, #1a4d1a 0%, #0d2b0d 100%);
+    min-height: 100vh;
+    color: #fff;
+    overflow-x: hidden;
+    position: relative;
+  }
+
+  /* Floating shamrocks */
+  .shamrock {
+    position: fixed;
+    opacity: 0.12;
+    animation: floatUp linear infinite;
+    pointer-events: none;
+    z-index: 0;
+  }
+  @keyframes floatUp {
+    0%   { transform: translateY(110vh) rotate(0deg); opacity: 0.05; }
+    10%  { opacity: 0.15; }
+    90%  { opacity: 0.1; }
+    100% { transform: translateY(-10vh) rotate(360deg); opacity: 0; }
+  }
+
+  /* Layout */
+  .container {
+    position: relative;
+    z-index: 1;
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 2rem 1rem 3rem;
+  }
+
+  header {
+    text-align: center;
+    margin-bottom: 2.5rem;
+  }
+  header h1 {
+    font-size: clamp(2rem, 6vw, 3.2rem);
+    color: #FFD700;
+    text-shadow: 0 0 20px rgba(255,215,0,0.5), 0 2px 4px rgba(0,0,0,0.6);
+    letter-spacing: 0.05em;
+  }
+  header .subtitle {
+    color: #90ee90;
+    font-style: italic;
+    font-size: 1.1rem;
+    margin-top: 0.4rem;
+    opacity: 0.9;
+  }
+
+  /* Dice area */
+  .dice-area {
+    display: flex;
+    justify-content: center;
+    gap: 3rem;
+    flex-wrap: wrap;
+    margin-bottom: 2rem;
+  }
+
+  .die-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .die-name {
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: #90ee90;
+    font-family: Georgia, serif;
+    font-size: 1.1rem;
+    text-align: center;
+    outline: none;
+    width: 180px;
+    padding: 0.2rem 0.4rem;
+    cursor: default;
+  }
+  .die-name.editable {
+    cursor: text;
+    border-bottom: 2px solid #FFD700;
+    color: #FFD700;
+  }
+
+  .die-svg-wrap {
+    cursor: pointer;
+    filter: drop-shadow(0 4px 16px rgba(0,180,0,0.35));
+    transition: filter 0.3s;
+  }
+  .die-svg-wrap:hover {
+    filter: drop-shadow(0 6px 24px rgba(0,220,0,0.5));
+  }
+
+  @keyframes rolling {
+    0%   { transform: rotate(0deg) scale(1); }
+    15%  { transform: rotate(-12deg) scale(0.85); }
+    30%  { transform: rotate(10deg) scale(0.9); }
+    45%  { transform: rotate(-8deg) scale(0.82); }
+    60%  { transform: rotate(6deg) scale(0.88); }
+    75%  { transform: rotate(-4deg) scale(0.92); }
+    90%  { transform: rotate(2deg) scale(0.97); }
+    100% { transform: rotate(0deg) scale(1); }
+  }
+  .die-svg-wrap.rolling {
+    animation: rolling 0.8s ease-in-out;
+  }
+
+  /* Roll button */
+  .roll-btn {
+    display: block;
+    margin: 0 auto 2rem;
+    padding: 0.9rem 2.8rem;
+    font-family: Georgia, serif;
+    font-size: 1.25rem;
+    color: #0d2b0d;
+    background: linear-gradient(135deg, #FFD700 0%, #ffa500 100%);
+    border: none;
+    border-radius: 50px;
+    cursor: pointer;
+    box-shadow: 0 4px 20px rgba(255,215,0,0.45), 0 2px 6px rgba(0,0,0,0.4);
+    transition: transform 0.15s, box-shadow 0.15s, opacity 0.2s;
+    font-weight: bold;
+    letter-spacing: 0.04em;
+  }
+  .roll-btn:hover:not(:disabled) {
+    transform: translateY(-2px) scale(1.03);
+    box-shadow: 0 6px 28px rgba(255,215,0,0.6), 0 3px 8px rgba(0,0,0,0.4);
+  }
+  .roll-btn:active:not(:disabled) { transform: translateY(0) scale(0.98); }
+  .roll-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+
+  /* Results */
+  .results {
+    display: flex;
+    justify-content: center;
+    gap: 2rem;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
+    min-height: 0;
+  }
+  .results.hidden { display: none; }
+
+  /* Special result */
+  .special-result {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 2rem;
+  }
+  .special-result.hidden { display: none; }
+
+  .result-card {
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,215,0,0.3);
+    border-radius: 16px;
+    padding: 1.2rem 1.8rem;
+    text-align: center;
+    min-width: 200px;
+    max-width: 280px;
+    flex: 1;
+    animation: fadeHighlight 0.5s ease;
+  }
+  .result-card.special-card {
+    border-color: #FFD700;
+    border-width: 2px;
+    background: rgba(255,215,0,0.08);
+    max-width: 420px;
+    min-width: 260px;
+    flex: none;
+    box-shadow: 0 0 24px rgba(255,215,0,0.2);
+  }
+
+  @keyframes fadeHighlight {
+    0%   { opacity: 0; transform: translateY(12px); background: rgba(255,215,0,0.2); }
+    60%  { background: rgba(255,215,0,0.1); }
+    100% { opacity: 1; transform: translateY(0); }
+  }
+  .result-card.special-card { animation: fadeHighlightSpecial 0.6s ease; }
+  @keyframes fadeHighlightSpecial {
+    0%   { opacity: 0; transform: scale(0.9) translateY(8px); }
+    60%  { transform: scale(1.03) translateY(0); }
+    100% { opacity: 1; transform: scale(1) translateY(0); }
+  }
+
+  .result-die-name {
+    color: #90ee90;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 0.4rem;
+  }
+  .special-card .result-die-name {
+    color: #FFD700;
+    font-size: 0.9rem;
+  }
+  .result-number {
+    color: #FFD700;
+    font-size: 2.5rem;
+    font-weight: bold;
+    line-height: 1.1;
+    text-shadow: 0 0 10px rgba(255,215,0,0.5);
+  }
+  .result-action {
+    color: #fff;
+    font-size: 1rem;
+    margin-top: 0.5rem;
+    font-style: italic;
+  }
+  .special-card .result-action {
+    font-size: 1.05rem;
+    color: #ffe87c;
+  }
+
+  /* Edit controls */
+  .edit-controls {
+    text-align: center;
+    margin-bottom: 1.5rem;
+  }
+  .edit-btn {
+    background: transparent;
+    border: 1px solid rgba(144,238,144,0.5);
+    color: #90ee90;
+    font-family: Georgia, serif;
+    font-size: 0.95rem;
+    padding: 0.55rem 1.6rem;
+    border-radius: 30px;
+    cursor: pointer;
+    transition: background 0.2s, border-color 0.2s;
+  }
+  .edit-btn:hover {
+    background: rgba(144,238,144,0.1);
+    border-color: #90ee90;
+  }
+
+  /* Edit panel */
+  .edit-panel {
+    display: none;
+    background: rgba(0,0,0,0.35);
+    border: 1px solid rgba(255,215,0,0.25);
+    border-radius: 16px;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+  }
+  .edit-panel.open { display: block; }
+
+  .edit-panel h2 {
+    color: #FFD700;
+    text-align: center;
+    margin-bottom: 1.2rem;
+    font-size: 1.2rem;
+  }
+
+  .edit-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+  }
+  @media (max-width: 560px) {
+    .edit-grid { grid-template-columns: 1fr; }
+  }
+
+  .edit-die-col h3 {
+    color: #90ee90;
+    font-size: 1rem;
+    margin-bottom: 0.8rem;
+    text-align: center;
+    border-bottom: 1px solid rgba(144,238,144,0.25);
+    padding-bottom: 0.4rem;
+  }
+
+  /* Special actions edit section */
+  .edit-special {
+    margin-top: 1.4rem;
+    padding-top: 1.2rem;
+    border-top: 1px solid rgba(255,215,0,0.2);
+  }
+  .edit-special h3 {
+    color: #FFD700;
+    font-size: 1rem;
+    margin-bottom: 0.9rem;
+    text-align: center;
+  }
+  .special-inputs {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+  }
+  @media (max-width: 560px) {
+    .special-inputs { grid-template-columns: 1fr; }
+  }
+  .special-input-group label {
+    display: block;
+    color: #FFD700;
+    font-size: 0.82rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 0.3rem;
+  }
+
+  .action-input-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+  }
+  .action-label {
+    color: #90ee90;
+    font-size: 0.85rem;
+    width: 1.6rem;
+    text-align: right;
+    flex-shrink: 0;
+  }
+  .action-input {
+    flex: 1;
+    background: rgba(255,255,255,0.07);
+    border: 1px solid rgba(255,215,0,0.2);
+    border-radius: 6px;
+    color: #fff;
+    font-family: Georgia, serif;
+    font-size: 0.88rem;
+    padding: 0.35rem 0.6rem;
+    outline: none;
+    transition: border-color 0.2s;
+    width: 100%;
+  }
+  .action-input:focus {
+    border-color: #FFD700;
+    background: rgba(255,215,0,0.06);
+  }
+
+  .save-btn {
+    display: block;
+    margin: 1.2rem auto 0;
+    padding: 0.65rem 2.2rem;
+    font-family: Georgia, serif;
+    font-size: 1rem;
+    color: #0d2b0d;
+    background: linear-gradient(135deg, #90ee90 0%, #3cb371 100%);
+    border: none;
+    border-radius: 30px;
+    cursor: pointer;
+    font-weight: bold;
+    box-shadow: 0 3px 12px rgba(60,179,113,0.4);
+    transition: transform 0.15s, box-shadow 0.15s;
+  }
+  .save-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 5px 18px rgba(60,179,113,0.55);
+  }
+
+  footer {
+    text-align: center;
+    color: rgba(144,238,144,0.6);
+    font-style: italic;
+    font-size: 0.9rem;
+    margin-top: 1rem;
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <h1>🍀 Lucky Dice 🍀</h1>
+    <p class="subtitle">St. Patrick's Day Edition</p>
+  </header>
+
+  <div class="dice-area">
+    <!-- Die 1 -->
+    <div class="die-container">
+      <input class="die-name" id="dieName1" type="text" value="Luck Die" readonly>
+      <div class="die-svg-wrap" id="dieWrap1">
+        <svg id="dieSvg1" viewBox="0 0 150 175" width="160" height="187" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="grad1Top" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" style="stop-color:#5dbe60"/>
+              <stop offset="100%" style="stop-color:#357a38"/>
+            </linearGradient>
+            <linearGradient id="grad1Left" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" style="stop-color:#3d8f41"/>
+              <stop offset="100%" style="stop-color:#1e6622"/>
+            </linearGradient>
+            <linearGradient id="grad1Right" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" style="stop-color:#316b34"/>
+              <stop offset="100%" style="stop-color:#1a4d1a"/>
+            </linearGradient>
+            <linearGradient id="grad1Bottom" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" style="stop-color:#1e6622"/>
+              <stop offset="100%" style="stop-color:#0d2b0d"/>
+            </linearGradient>
+            <filter id="numGlow1" x="-60%" y="-60%" width="220%" height="220%">
+              <feGaussianBlur stdDeviation="3" result="blur"/>
+              <feMerge>
+                <feMergeNode in="blur"/>
+                <feMergeNode in="SourceGraphic"/>
+              </feMerge>
+            </filter>
+          </defs>
+          <!-- Faces -->
+          <polygon points="75,8 142,87 8,87"   fill="url(#grad1Top)"    stroke="#FFD700" stroke-width="2"/>
+          <polygon points="75,8 8,87 75,167"   fill="url(#grad1Left)"   stroke="#FFD700" stroke-width="2"/>
+          <polygon points="75,8 142,87 75,167" fill="url(#grad1Right)"  stroke="#FFD700" stroke-width="2"/>
+          <polygon points="8,87 142,87 75,167" fill="url(#grad1Bottom)" stroke="#FFD700" stroke-width="2"/>
+          <!-- Subtle dividers -->
+          <line x1="75" y1="8" x2="75" y2="167" stroke="rgba(255,215,0,0.18)" stroke-width="1"/>
+          <line x1="8"  y1="87" x2="142" y2="87" stroke="rgba(255,215,0,0.18)" stroke-width="1"/>
+          <!-- Dark backing for number -->
+          <circle cx="75" cy="90" r="30" fill="rgba(0,0,0,0.52)"/>
+          <!-- Number with dark outline for contrast -->
+          <text id="dieNum1" x="75" y="90"
+            text-anchor="middle" dominant-baseline="central"
+            font-family="Georgia, serif" font-size="44" font-weight="bold"
+            fill="#FFD700"
+            stroke="#0a1a0a" stroke-width="5" paint-order="stroke fill"
+            filter="url(#numGlow1)">?</text>
+        </svg>
+      </div>
+    </div>
+
+    <!-- Die 2 -->
+    <div class="die-container">
+      <input class="die-name" id="dieName2" type="text" value="Fortune Die" readonly>
+      <div class="die-svg-wrap" id="dieWrap2">
+        <svg id="dieSvg2" viewBox="0 0 150 175" width="160" height="187" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="grad2Top" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" style="stop-color:#70c274"/>
+              <stop offset="100%" style="stop-color:#3d9142"/>
+            </linearGradient>
+            <linearGradient id="grad2Left" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" style="stop-color:#47a34b"/>
+              <stop offset="100%" style="stop-color:#1e6622"/>
+            </linearGradient>
+            <linearGradient id="grad2Right" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" style="stop-color:#3d8f41"/>
+              <stop offset="100%" style="stop-color:#1a4d1a"/>
+            </linearGradient>
+            <linearGradient id="grad2Bottom" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" style="stop-color:#1e6622"/>
+              <stop offset="100%" style="stop-color:#0d2b0d"/>
+            </linearGradient>
+            <filter id="numGlow2" x="-60%" y="-60%" width="220%" height="220%">
+              <feGaussianBlur stdDeviation="3" result="blur"/>
+              <feMerge>
+                <feMergeNode in="blur"/>
+                <feMergeNode in="SourceGraphic"/>
+              </feMerge>
+            </filter>
+          </defs>
+          <polygon points="75,8 142,87 8,87"   fill="url(#grad2Top)"    stroke="#FFD700" stroke-width="2"/>
+          <polygon points="75,8 8,87 75,167"   fill="url(#grad2Left)"   stroke="#FFD700" stroke-width="2"/>
+          <polygon points="75,8 142,87 75,167" fill="url(#grad2Right)"  stroke="#FFD700" stroke-width="2"/>
+          <polygon points="8,87 142,87 75,167" fill="url(#grad2Bottom)" stroke="#FFD700" stroke-width="2"/>
+          <line x1="75" y1="8" x2="75" y2="167" stroke="rgba(255,215,0,0.18)" stroke-width="1"/>
+          <line x1="8"  y1="87" x2="142" y2="87" stroke="rgba(255,215,0,0.18)" stroke-width="1"/>
+          <circle cx="75" cy="90" r="30" fill="rgba(0,0,0,0.52)"/>
+          <text id="dieNum2" x="75" y="90"
+            text-anchor="middle" dominant-baseline="central"
+            font-family="Georgia, serif" font-size="44" font-weight="bold"
+            fill="#FFD700"
+            stroke="#0a1a0a" stroke-width="5" paint-order="stroke fill"
+            filter="url(#numGlow2)">?</text>
+        </svg>
+      </div>
+    </div>
+  </div>
+
+  <button class="roll-btn" id="rollBtn">🍀 Roll the Dice 🍀</button>
+
+  <!-- Per-die results -->
+  <div class="results hidden" id="results">
+    <div class="result-card" id="result1">
+      <div class="result-die-name" id="resName1">Luck Die</div>
+      <div class="result-number" id="resNum1">—</div>
+      <div class="result-action" id="resAction1">—</div>
+    </div>
+    <div class="result-card" id="result2">
+      <div class="result-die-name" id="resName2">Fortune Die</div>
+      <div class="result-number" id="resNum2">—</div>
+      <div class="result-action" id="resAction2">—</div>
+    </div>
+  </div>
+
+  <!-- Special bonus result -->
+  <div class="special-result hidden" id="specialResult">
+    <div class="result-card special-card" id="resultSpecial">
+      <div class="result-die-name" id="resSpecialLabel">✨ Bonus</div>
+      <div class="result-action" id="resSpecialAction">—</div>
+    </div>
+  </div>
+
+  <div class="edit-controls">
+    <button class="edit-btn" id="editBtn">✏️ Customize Actions</button>
+  </div>
+
+  <div class="edit-panel" id="editPanel">
+    <h2>✏️ Customize Your Dice</h2>
+    <div class="edit-grid">
+      <div class="edit-die-col" id="editCol1">
+        <h3>Luck Die — Actions</h3>
+      </div>
+      <div class="edit-die-col" id="editCol2">
+        <h3>Fortune Die — Actions</h3>
+      </div>
+    </div>
+
+    <!-- Special actions -->
+    <div class="edit-special">
+      <h3>✨ Bonus Actions</h3>
+      <div class="special-inputs">
+        <div class="special-input-group">
+          <label>🎲 Doubles</label>
+          <input class="action-input" type="text" id="editDoubles">
+        </div>
+        <div class="special-input-group">
+          <label>2️⃣ Both Even</label>
+          <input class="action-input" type="text" id="editEvens">
+        </div>
+        <div class="special-input-group">
+          <label>1️⃣ Both Odd</label>
+          <input class="action-input" type="text" id="editOdds">
+        </div>
+      </div>
+    </div>
+
+    <button class="save-btn" id="saveBtn">💾 Save Changes</button>
+  </div>
+
+  <footer>May luck be with you always 🍀</footer>
+</div>
+
+<script>
+  // ── Default data ──────────────────────────────────────────────────────────
+  const DEFAULT_ACTIONS = {
+    die1: {
+      name: 'Luck Die',
+      actions: [
+        'Find a Gold Coin',
+        'Chase the Rainbow',
+        'Grant a Wish',
+        "Steal Their Luck",
+        "Leprechaun's Dance",
+        'Pot of Gold',
+        'Four-Leaf Clover',
+        'Shamrock Shake'
+      ]
+    },
+    die2: {
+      name: 'Fortune Die',
+      actions: [
+        'Double Your Luck',
+        'Dark Omen Looms',
+        'Lucky Charm Activates',
+        'Lost in the Fog',
+        'Green Beer Bonus',
+        'Celtic Blessing',
+        'Fairy Dust Falls',
+        'Rainbow Bridge Opens'
+      ]
+    },
+    special: {
+      doubles: "Lucky Doubles! The leprechaun blesses you — take an extra turn!",
+      evens:   "Even Fortune — balance tips in your favor. Draw a bonus card!",
+      odds:    "Wild Odds — chaos magic stirs. The rules bend for one round!"
+    }
+  };
+
+  function deepCopy(obj) { return JSON.parse(JSON.stringify(obj)); }
+
+  // ── Load persisted data ───────────────────────────────────────────────────
+  let diceData;
+  try {
+    const stored = localStorage.getItem('luckyDice');
+    diceData = stored ? JSON.parse(stored) : deepCopy(DEFAULT_ACTIONS);
+    // Migrate: ensure special key exists for saved data missing it
+    if (!diceData.special) diceData.special = deepCopy(DEFAULT_ACTIONS.special);
+  } catch (e) {
+    diceData = deepCopy(DEFAULT_ACTIONS);
+  }
+
+  // ── DOM refs ──────────────────────────────────────────────────────────────
+  const rollBtn        = document.getElementById('rollBtn');
+  const results        = document.getElementById('results');
+  const specialResult  = document.getElementById('specialResult');
+  const editBtn        = document.getElementById('editBtn');
+  const editPanel      = document.getElementById('editPanel');
+  const saveBtn        = document.getElementById('saveBtn');
+  const dieName1       = document.getElementById('dieName1');
+  const dieName2       = document.getElementById('dieName2');
+  const dieWrap1       = document.getElementById('dieWrap1');
+  const dieWrap2       = document.getElementById('dieWrap2');
+  const dieNum1        = document.getElementById('dieNum1');
+  const dieNum2        = document.getElementById('dieNum2');
+  const resName1       = document.getElementById('resName1');
+  const resName2       = document.getElementById('resName2');
+  const resNum1        = document.getElementById('resNum1');
+  const resNum2        = document.getElementById('resNum2');
+  const resAction1     = document.getElementById('resAction1');
+  const resAction2     = document.getElementById('resAction2');
+  const resSpecialLabel  = document.getElementById('resSpecialLabel');
+  const resSpecialAction = document.getElementById('resSpecialAction');
+  const editCol1       = document.getElementById('editCol1');
+  const editCol2       = document.getElementById('editCol2');
+  const editDoubles    = document.getElementById('editDoubles');
+  const editEvens      = document.getElementById('editEvens');
+  const editOdds       = document.getElementById('editOdds');
+
+  // ── Apply loaded data to UI ───────────────────────────────────────────────
+  function applyData() {
+    dieName1.value = diceData.die1.name;
+    dieName2.value = diceData.die2.name;
+    resName1.textContent = diceData.die1.name;
+    resName2.textContent = diceData.die2.name;
+  }
+
+  // ── Build edit panel ──────────────────────────────────────────────────────
+  function buildEditPanel() {
+    function buildCol(col, dieKey, title) {
+      col.innerHTML = `<h3>${title}</h3>`;
+      diceData[dieKey].actions.forEach((action, i) => {
+        const row = document.createElement('div');
+        row.className = 'action-input-row';
+        row.innerHTML = `
+          <span class="action-label">${i + 1}.</span>
+          <input class="action-input" type="text" data-die="${dieKey}" data-index="${i}" value="${escHtml(action)}">
+        `;
+        col.appendChild(row);
+      });
+    }
+    buildCol(editCol1, 'die1', diceData.die1.name + ' — Actions');
+    buildCol(editCol2, 'die2', diceData.die2.name + ' — Actions');
+    editDoubles.value = diceData.special.doubles;
+    editEvens.value   = diceData.special.evens;
+    editOdds.value    = diceData.special.odds;
+  }
+
+  function escHtml(str) {
+    return str.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  // ── Roll logic ────────────────────────────────────────────────────────────
+  function rand8() { return Math.floor(Math.random() * 8) + 1; }
+
+  function animateDie(wrapEl, numEl, finalVal, delay, onDone) {
+    setTimeout(() => {
+      wrapEl.classList.add('rolling');
+      let ticks = 0;
+      const iv = setInterval(() => {
+        numEl.textContent = rand8();
+        ticks++;
+        if (ticks >= 8) {
+          clearInterval(iv);
+          numEl.textContent = finalVal;
+          wrapEl.addEventListener('animationend', function handler() {
+            wrapEl.classList.remove('rolling');
+            wrapEl.removeEventListener('animationend', handler);
+            onDone();
+          });
+        }
+      }, 80);
+    }, delay);
+  }
+
+  function reanimateCard(id) {
+    const card = document.getElementById(id);
+    if (!card) return;
+    const clone = card.cloneNode(true);
+    card.parentNode.replaceChild(clone, card);
+  }
+
+  rollBtn.addEventListener('click', () => {
+    rollBtn.disabled = true;
+    results.classList.add('hidden');
+    specialResult.classList.add('hidden');
+
+    const v1 = rand8();
+    const v2 = rand8();
+    let done1 = false, done2 = false;
+
+    function checkDone() {
+      if (!done1 || !done2) return;
+
+      // Fill per-die cards
+      document.getElementById('resName1').textContent   = diceData.die1.name;
+      document.getElementById('resName2').textContent   = diceData.die2.name;
+      document.getElementById('resNum1').textContent    = v1;
+      document.getElementById('resNum2').textContent    = v2;
+      document.getElementById('resAction1').textContent = diceData.die1.actions[v1 - 1];
+      document.getElementById('resAction2').textContent = diceData.die2.actions[v2 - 1];
+      reanimateCard('result1');
+      reanimateCard('result2');
+      results.classList.remove('hidden');
+
+      // Detect special condition (doubles takes priority)
+      let specialLabel = null;
+      let specialText  = null;
+      if (v1 === v2) {
+        specialLabel = '🎲 Lucky Doubles!';
+        specialText  = diceData.special.doubles;
+      } else if (v1 % 2 === 0 && v2 % 2 === 0) {
+        specialLabel = '2️⃣ Both Even';
+        specialText  = diceData.special.evens;
+      } else if (v1 % 2 === 1 && v2 % 2 === 1) {
+        specialLabel = '1️⃣ Both Odd';
+        specialText  = diceData.special.odds;
+      }
+
+      if (specialText) {
+        document.getElementById('resSpecialLabel').textContent  = specialLabel;
+        document.getElementById('resSpecialAction').textContent = specialText;
+        reanimateCard('resultSpecial');
+        specialResult.classList.remove('hidden');
+      }
+
+      rollBtn.disabled = false;
+    }
+
+    animateDie(dieWrap1, dieNum1, v1, 0,   () => { done1 = true; checkDone(); });
+    animateDie(dieWrap2, dieNum2, v2, 150, () => { done2 = true; checkDone(); });
+  });
+
+  // ── Edit panel toggle ─────────────────────────────────────────────────────
+  let editOpen = false;
+
+  editBtn.addEventListener('click', () => {
+    editOpen = !editOpen;
+    if (editOpen) {
+      buildEditPanel();
+      editPanel.classList.add('open');
+      editBtn.textContent = '✖ Close Editor';
+      dieName1.removeAttribute('readonly'); dieName1.classList.add('editable');
+      dieName2.removeAttribute('readonly'); dieName2.classList.add('editable');
+    } else {
+      closeEditor();
+    }
+  });
+
+  function closeEditor() {
+    editPanel.classList.remove('open');
+    editBtn.textContent = '✏️ Customize Actions';
+    dieName1.setAttribute('readonly', ''); dieName1.classList.remove('editable');
+    dieName2.setAttribute('readonly', ''); dieName2.classList.remove('editable');
+    editOpen = false;
+  }
+
+  // ── Save changes ──────────────────────────────────────────────────────────
+  saveBtn.addEventListener('click', () => {
+    diceData.die1.name = dieName1.value.trim() || 'Luck Die';
+    diceData.die2.name = dieName2.value.trim() || 'Fortune Die';
+
+    editPanel.querySelectorAll('.action-input[data-die]').forEach(input => {
+      const die   = input.dataset.die;
+      const index = parseInt(input.dataset.index, 10);
+      diceData[die].actions[index] = input.value.trim() || DEFAULT_ACTIONS[die].actions[index];
+    });
+
+    diceData.special.doubles = editDoubles.value.trim() || DEFAULT_ACTIONS.special.doubles;
+    diceData.special.evens   = editEvens.value.trim()   || DEFAULT_ACTIONS.special.evens;
+    diceData.special.odds    = editOdds.value.trim()    || DEFAULT_ACTIONS.special.odds;
+
+    try { localStorage.setItem('luckyDice', JSON.stringify(diceData)); } catch(e) {}
+
+    applyData();
+    closeEditor();
+
+    saveBtn.textContent = '✅ Saved!';
+    setTimeout(() => { saveBtn.textContent = '💾 Save Changes'; }, 1500);
+  });
+
+  // ── Floating shamrocks ────────────────────────────────────────────────────
+  const SHAMROCKS = ['🍀', '☘️', '🍀', '🌿', '🍀'];
+  function spawnShamrock() {
+    const el = document.createElement('span');
+    el.className = 'shamrock';
+    el.textContent = SHAMROCKS[Math.floor(Math.random() * SHAMROCKS.length)];
+    const duration = 8 + Math.random() * 12;
+    el.style.left = (Math.random() * 100) + 'vw';
+    el.style.fontSize = (1 + Math.random() * 1.5) + 'rem';
+    el.style.animationDuration = duration + 's';
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), duration * 1000 + 200);
+  }
+  for (let i = 0; i < 12; i++) setTimeout(spawnShamrock, i * 600);
+  setInterval(spawnShamrock, 1800);
+
+  // ── Init ──────────────────────────────────────────────────────────────────
+  applyData();
+</script>
+</body>
+</html>
